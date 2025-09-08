@@ -147,6 +147,8 @@ typedef struct telnet_telopt_t telnet_telopt_t;
 #define TELNET_TELOPT_EXOPL 255
 
 #define TELNET_TELOPT_MCCP2 86
+#define TELNET_TELOPT_MCCP3 87
+#define TELNET_TELOPT_MCCPX 88
 /*@}*/
 
 /*! \name Protocol codes for TERMINAL-TYPE commands. */
@@ -173,6 +175,14 @@ typedef struct telnet_telopt_t telnet_telopt_t;
 /*! MSSP codes. */
 #define TELNET_MSSP_VAR 1
 #define TELNET_MSSP_VAL 2
+/*@}*/
+
+/*! \name Protocol codes for TERMINAL-TYPE commands. */
+/*@{*/
+/*! TERMINAL-TYPE codes. */
+#define TELNET_MCCPX_ACCEPT_ENCODING 1
+#define TELNET_MCCPX_BEGIN_ENCODING 2
+#define TELNET_MCCPX_WONT 252
 /*@}*/
 
 /*! \name Telnet state tracker flags. */
@@ -218,9 +228,71 @@ enum telnet_event_type_t {
 	TELNET_EV_ENVIRON,         /*!< ENVIRON command has been received */
 	TELNET_EV_MSSP,            /*!< MSSP command has been received */
 	TELNET_EV_WARNING,         /*!< recoverable error has occured */
+	TELNET_EV_MCCPX,           /*!< MCCPX suboption command occured */
 	TELNET_EV_ERROR            /*!< non-recoverable error has occured */
 };
 typedef enum telnet_event_type_t telnet_event_type_t; /*!< Telnet event type. */
+
+enum stream_direction_t {
+	STREAM_SEND = 0,
+	STREAM_RECV = 1,
+	STREAM_MAX = 2
+};
+typedef enum stream_direction_t stream_direction_t;
+
+
+/* ---- MCCPX section BEGIN ---- */
+typedef struct mccpx_compression_t mccpx_compression_t;
+typedef struct mccpx_stream_t mccpx_stream_t;
+
+/* MCCPX encoding INIT */
+typedef telnet_error_t (mccpx_init_fn_t)(
+	telnet_t *telnet,
+	mccpx_stream_t *stream
+);
+
+/* MCCPX encoding SEND */
+typedef telnet_error_t (mccpx_send_fn_t)(
+	telnet_t *telnet, mccpx_stream_t *stream, const char *buffer, size_t size
+);
+
+/* MCCPX encoding RECV */
+typedef telnet_error_t (mccpx_recv_fn_t)(
+	telnet_t *telnet, mccpx_stream_t *stream, const char *buffer, size_t size
+);
+
+/* MCCPX encoding FREE */
+typedef void (mccpx_free_fn_t)(
+	telnet_t *telnet, mccpx_stream_t *stream);
+
+struct mccpx_compression_t {
+	char *name;					/* IANA name for compression encoding. */
+	mccpx_init_fn_t *init;		/* init function. */
+	mccpx_send_fn_t *send;		/* deflate function. */
+	mccpx_recv_fn_t *recv;		/* inflate function. */
+	mccpx_free_fn_t *free;		/* free function. */
+};
+
+struct mccpx_stream_t {
+	mccpx_compression_t *enc;		/* pointer to compression definition */
+	stream_direction_t direction;	/* in case init or free needs to know. */
+	const char *offered;			/* list of acceptable encodings */
+	long int in;					/* bytes input */
+	long int out;					/* bytes output */
+	void *ctx;						/* pointer to compression context state */
+};
+typedef struct mccpx_stream_t mccpx_stream_t;
+
+/* public declarations */
+void mccpx_end(telnet_t *telnet,stream_direction_t dir);
+void mccpx_inform_ev(telnet_t *telnet, stream_direction_t dir, telnet_error_t status, const char *msg);
+extern void telnet_send_mccpx_accept(telnet_t *telnet, const char *encoding_list, size_t len);
+extern void telnet_send_mccpx_begin(telnet_t *telnet, const char *encoding, size_t len);
+/* telnet is a private struct, which is kind of a pita.  This lets userland
+ * access a compression stream directly.*/
+mccpx_stream_t *telnet_mccpx_getstream(telnet_t *telnet, stream_direction_t dir);
+
+/* ---- MCCPX section END ---- */
 
 /*! 
  * environ/MSSP command information 
@@ -337,6 +409,20 @@ union telnet_event_t {
 		const struct telnet_environ_t *values; /*!< array of variable values */
 		size_t size;                           /*!< number of elements in values */
 	} mssp; /*!< MSSP */
+
+	/*!
+	 * MCCPX event
+	 */
+	struct mccpx_t {
+		enum telnet_event_type_t _type; /*!< alias for type */
+		stream_direction_t direction;   /*!< which direction are we talking about? */
+		unsigned char telopt;			/*!< which mccpx option are we talking about? */
+		const char *offered;            /*!< list of encodings offered */
+		const char *inuse;              /*!< list of encodings offered */
+		const char *msg;                /*!< verbose message */
+		telnet_error_t status;			/*!< TELNET_EOK, or TELNET_EPROTOCOL if no compatible compression types are found. */
+	} mccpx; /*!< MCCPX */
+
 };
 
 /*! 
@@ -682,6 +768,10 @@ extern void telnet_zmp_arg(telnet_t *telnet, const char *arg);
  * \param telnet Telnet state tracker object.
  */
 #define telnet_finish_zmp(telnet) telnet_finish_sb((telnet))
+
+/* JSJ LociTerm addtion to libtelnet!!! */
+extern int telnet_check_option(telnet_t *telnet, unsigned char telopt, int *us, int *them);
+int *telnet_option_list(telnet_t *telnet);
 
 /* C++ support */
 #if defined(__cplusplus)

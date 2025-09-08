@@ -17,6 +17,10 @@ else ()
     endif ()
 endif ()
 
+find_package(ZLIB)
+add_definitions(-DHAVE_ZLIB=1)
+add_definitions(-DHAVE_ZSTD=1)
+
 add_library(libtelnet libtelnet.c)
 
 target_include_directories(libtelnet

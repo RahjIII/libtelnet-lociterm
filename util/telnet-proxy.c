@@ -52,6 +52,7 @@
 
 #include "libtelnet.h"
 
+#define ENABLE_COLOR 1
 #ifdef ENABLE_COLOR
 # define COLOR_SERVER "\e[35m"
 # define COLOR_CLIENT "\e[34m"
@@ -148,6 +149,7 @@ static const char *get_opt(unsigned char opt) {
 	case 70: return "MSSP";
 	case 85: return "COMPRESS";
 	case 86: return "COMPRESS2";
+	case 88: return "MCCPX";
 	case 93: return "ZMP";
 	case 255: return "EXOPL";
 	default: return "unknown";

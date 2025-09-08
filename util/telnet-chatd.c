@@ -50,6 +50,7 @@
 #define LINEBUFFER_SIZE 256
 
 static const telnet_telopt_t telopts[] = {
+	{ TELNET_TELOPT_MCCPX,	TELNET_WILL, TELNET_DO },
 	{ TELNET_TELOPT_COMPRESS2,	TELNET_WILL, TELNET_DONT },
 	{ -1, 0, 0 }
 };
@@ -173,6 +174,16 @@ static void _online(const char *line, size_t overflow, void *ud) {
 
 	/* just a message -- send to all users */
 	_message(user->name, line);
+
+	if (strcmp(line, "test") == 0) {
+		FILE *in = fopen("testdata","r");
+		char b[1024];
+		while(fgets(b,sizeof(b),in)) {
+			telnet_send(user->telnet, b, strlen(b));
+		}
+		fclose(in);
+	}
+
 }
 
 static void _input(struct user_t *user, const char *buffer,
@@ -191,8 +202,8 @@ static void _event_handler(telnet_t *telnet, telnet_event_t *ev,
 	/* data received */
 	case TELNET_EV_DATA:
 		_input(user, ev->data.buffer, ev->data.size);
-					telnet_negotiate(telnet, TELNET_WONT, TELNET_TELOPT_ECHO);
-			telnet_negotiate(telnet, TELNET_WILL, TELNET_TELOPT_ECHO);
+//					telnet_negotiate(telnet, TELNET_WONT, TELNET_TELOPT_ECHO);
+//			telnet_negotiate(telnet, TELNET_WILL, TELNET_TELOPT_ECHO);
 		break;
 	/* data must be sent */
 	case TELNET_EV_SEND:
@@ -200,9 +211,16 @@ static void _event_handler(telnet_t *telnet, telnet_event_t *ev,
 		break;
 	/* enable compress2 if accepted by client */
 	case TELNET_EV_DO:
-		if (ev->neg.telopt == TELNET_TELOPT_COMPRESS2)
-			telnet_begin_compress2(telnet);
+		if (ev->neg.telopt == TELNET_TELOPT_COMPRESS2) telnet_begin_compress2(telnet);
 		break;
+	case TELNET_EV_WILL:
+		if (ev->neg.telopt == TELNET_TELOPT_MCCPX) {
+			//char accept_encodings[]="x-nope";
+			//telnet_send_mccpx_accept(telnet,accept_encodings,strlen(accept_encodings));
+			telnet_send_mccpx_accept(telnet,NULL,0);
+		}
+		break;
+
 	/* error */
 	case TELNET_EV_ERROR:
 		close(user->sock);
@@ -333,11 +351,11 @@ int main(int argc, char **argv) {
 			users[i].sock = client_sock;
 			users[i].telnet = telnet_init(telopts, _event_handler, 0,
 					&users[i]);
-			telnet_negotiate(users[i].telnet, TELNET_WILL,
-					TELNET_TELOPT_COMPRESS2);
+			telnet_negotiate(users[i].telnet, TELNET_WILL, TELNET_TELOPT_MCCPX);
+			telnet_negotiate(users[i].telnet, TELNET_WILL, TELNET_TELOPT_COMPRESS2);
 			telnet_printf(users[i].telnet, "Enter name: ");
 
-			telnet_negotiate(users[i].telnet, TELNET_WILL, TELNET_TELOPT_ECHO);
+			//telnet_negotiate(users[i].telnet, TELNET_WILL, TELNET_TELOPT_ECHO);
 		}
 
 		/* read from client */
