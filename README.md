@@ -735,13 +735,14 @@ The list of compression algorithms supported by the compressor is determined at
 build time.
 
 An application wishing to support MCCPX decompression must provide a handler
-for the reciept of a TELNET_EV_WILL TELNET_TELOPT_MCCPX event that, that
+for the receipt of a TELNET_EV_WILL TELNET_TELOPT_MCCPX event that, that
 provides an preference ordered list of acceptable compression protocols.  It
 may also choose to offer upstream compression from this handler as well.
 
 For example:
 
- `case TELNET_EV_WILL: {
+```C
+case TELNET_EV_WILL: {
      if (ev->neg.telopt == TELNET_TELOPT_MCCPX) {
          char accept_encodings[]="x-custom,zstd,deflate";
          telnet_send_mccpx_accept(telnet,accept_encodings,strlen(accept_encodings));
@@ -749,12 +750,15 @@ For example:
      /* offer 'upstream' compression too. */
      telnet_negotiate(telnet, TELNET_WILL, TELNET_TELOPT_MCCPX);
      break;
- }`
+ }
+```
 
  Alternately, the application may send a null list of encodings to indicate the
  list of compiled in compression algorithms, for example:
 
- `telnet_send_mccpx_accept(telnet,NULL,0);`
+```
+telnet_send_mccpx_accept(telnet,NULL,0);
+```
 
 Note that the compression telopts COMPRESS, COMPRESS2, MCCP2, MCCP3 and MCCPX
 are mutually exclusive!  libtelnet will negotiate the first algorithm that it
