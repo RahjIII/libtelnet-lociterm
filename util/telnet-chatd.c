@@ -215,9 +215,9 @@ static void _event_handler(telnet_t *telnet, telnet_event_t *ev,
 		break;
 	case TELNET_EV_WILL:
 		if (ev->neg.telopt == TELNET_TELOPT_MCCPX) {
-			//char accept_encodings[]="x-nope";
-			//telnet_send_mccpx_accept(telnet,accept_encodings,strlen(accept_encodings));
-			telnet_send_mccpx_accept(telnet,NULL,0);
+			char accept_encodings[]="x-nope";
+			telnet_send_mccpx_accept(telnet,accept_encodings,strlen(accept_encodings));
+			//telnet_send_mccpx_accept(telnet,NULL,0);
 		}
 		break;
 
